@@ -2,7 +2,7 @@ import mediapipe as mp
 import cv2
 import copy
 import os
-
+ # test
 from Utilities import *
 from HandDetector import HandDetector
 from PreProcessing import HandNormalizer, combine_hands_features
