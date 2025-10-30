@@ -150,6 +150,17 @@ def train_model(hand_type):
     model.save(model_path)
     print(f"Saved {hand_type} model to {model_path}")
 
+    # ---- Export TensorFlow Lite version ----
+    try:
+        converter = tf.lite.TFLiteConverter.from_keras_model(model)
+        tflite_model = converter.convert()
+        tflite_path = model_path.replace(".h5", ".tflite")
+        with open(tflite_path, "wb") as f:
+            f.write(tflite_model)
+        print(f"✅ Exported TFLite model to {tflite_path}")
+    except Exception as e:
+        print(f"⚠️ TFLite conversion failed: {e}")
+
     # Log the training info
     epochs_run = len(history.history['loss'])
     log_training(hand_type, test_acc, epochs_run, dataset_path)
