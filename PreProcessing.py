@@ -12,7 +12,7 @@ class HandNormalizer:
         norm_data = normalizer.normalize_ hand(landmarks)
     """
 
-    def __init__(self, rotation_invariant=True, include_z=False):
+    def __init__(self, rotation_invariant=False, include_z=False):
         """
         Args:
             rotation_invariant (bool): Rotate hand to a canonical axis.

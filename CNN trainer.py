@@ -2,7 +2,7 @@ import os
 import json
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers, models, callbacks
+from tensorflow.keras import layers, models, callbacks, regularizers
 from datetime import datetime
 
 # ----------------------------
@@ -12,6 +12,9 @@ DATA_DIR = "processed_dataset"
 MODEL_DIR = "trained_model"
 LOG_FILE = os.path.join(MODEL_DIR, "train_log.json")
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+# L2 regularization strength (weight decay)
+L2_REG = 1e-4
 
 DATASETS = {
     "onehand": {
@@ -75,18 +78,33 @@ def log_training(hand_type, test_acc, epochs_run, dataset_path):
         json.dump(logs, f, indent=4)
 
 # ----------------------------
-# Build CNN model
+# Build CNN model (with L2 regularization)
 # ----------------------------
 def build_cnn_model(input_shape, num_classes):
+    reg = regularizers.l2(L2_REG)
+
     model = models.Sequential([
-        layers.Conv1D(64, 3, activation='relu', input_shape=input_shape),
+        # --- Feature extraction layers ---
+        layers.Conv1D(64, 3, activation='relu', padding='same',
+                      kernel_regularizer=reg, input_shape=input_shape),
         layers.BatchNormalization(),
         layers.MaxPooling1D(2),
-        layers.Conv1D(128, 3, activation='relu'),
+
+        layers.Conv1D(128, 3, activation='relu', padding='same',
+                      kernel_regularizer=reg),
         layers.BatchNormalization(),
         layers.MaxPooling1D(2),
+
+        layers.Conv1D(256, 3, activation='relu', padding='same',
+                      kernel_regularizer=reg),
+        layers.BatchNormalization(),
+        layers.MaxPooling1D(2),
+
+        # --- Classifier head ---
         layers.Flatten(),
-        layers.Dense(128, activation='relu'),
+        layers.Dense(256, activation='relu', kernel_regularizer=reg),
+        layers.Dropout(0.4),
+        layers.Dense(128, activation='relu', kernel_regularizer=reg),
         layers.Dropout(0.3),
         layers.Dense(num_classes, activation='softmax')
     ])
@@ -96,6 +114,7 @@ def build_cnn_model(input_shape, num_classes):
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )
+
     return model
 
 # ----------------------------
@@ -147,6 +166,7 @@ def train_model(hand_type):
     test_loss, test_acc = model.evaluate(X_test, y_test, verbose=0)
     print(f"{hand_type.capitalize()} model test accuracy: {test_acc:.4f}")
 
+    # Save model (.h5)
     model.save(model_path)
     print(f"Saved {hand_type} model to {model_path}")
 

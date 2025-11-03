@@ -8,8 +8,8 @@ from PreProcessing import HandNormalizer, combine_hands_features
 # ----------------------------
 SMOOTH = {
     "mode": "ema",              # "ema" or "majority"
-    "alpha": 0.25,              # responsiveness (lower = smoother, higher = faster)
-    "min_stable_frames": 3,     # require N consistent frames before switching gesture
+    "alpha": 0.20,              # responsiveness (lower = smoother, higher = faster)
+    "min_stable_frames": 4,     # require N consistent frames before switching gesture
     "window": 20                # only used in majority mode
 }
 
@@ -101,7 +101,7 @@ class LiveGestureInference:
     def __init__(self, hand_type="onehand"):
         self.hand_type = hand_type
         self.model, self.norm_params, self.label_map_inv, self.is_tflite = load_model_and_params(hand_type)
-        self.normalizer = HandNormalizer(rotation_invariant=True, include_z=False)
+        self.normalizer = HandNormalizer(include_z=False)
 
         num_classes = len(self.label_map_inv)
         self.smoother = GestureSmoother(num_classes)

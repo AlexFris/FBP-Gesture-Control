@@ -10,7 +10,7 @@ class HandDetector:
     utility functions like counting fingers, distances, angles, and distance to camera.
     """
 
-    def __init__(self, staticMode=False, maxHands=2, modelComplexity=1, detectionCon=0.5, minTrackCon=0.5):
+    def __init__(self, staticMode=False, maxHands=2, modelComplexity=1, detectionCon=0.8, minTrackCon=0.8):
         """
         Args:
             staticMode (bool): Detect hands on each frame (slower) or continuous tracking.
