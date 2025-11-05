@@ -1,6 +1,9 @@
+import os
+import json
+
 import numpy as np
 import tensorflow as tf
-import json
+
 from PreProcessing import HandNormalizer, combine_hands_features
 
 # ----------------------------
@@ -15,19 +18,21 @@ SMOOTH = {
 
 MODEL_DIR = "trained_model"
 DATA_DIR = "processed_dataset"
+STATIC_DATA_DIR = os.path.join(DATA_DIR, "static")
+
 
 MODELS = {
     "onehand": {
         "model_path": f"{MODEL_DIR}/gesture_cnn_onehand.h5",
         "tflite_path": f"{MODEL_DIR}/gesture_cnn_onehand.tflite",
-        "norm_params": f"{DATA_DIR}/norm_params_onehand.json",
-        "label_map": f"{DATA_DIR}/label_map_onehand.json"
+        "norm_params": os.path.join(STATIC_DATA_DIR, "norm_params_onehand.json"),
+        "label_map": os.path.join(STATIC_DATA_DIR, "label_map_onehand.json"),
     },
     "twohand": {
         "model_path": f"{MODEL_DIR}/gesture_cnn_twohand.h5",
         "tflite_path": f"{MODEL_DIR}/gesture_cnn_twohand.tflite",
-        "norm_params": f"{DATA_DIR}/norm_params_twohand.json",
-        "label_map": f"{DATA_DIR}/label_map_twohand.json"
+        "norm_params": os.path.join(STATIC_DATA_DIR, "norm_params_twohand.json"),
+        "label_map": os.path.join(STATIC_DATA_DIR, "label_map_twohand.json"),
     }
 }
 
@@ -90,8 +95,11 @@ def load_model_and_params(hand_type="onehand"):
         is_tflite = False
         print(f"⚠️ Loaded Keras .h5: {cfg['model_path']}")
 
-    norm_params = json.load(open(cfg["norm_params"]))
-    label_map = json.load(open(cfg["label_map"]))
+    with open(cfg["norm_params"], "r") as f:
+        norm_params = json.load(f)
+    with open(cfg["label_map"], "r") as f:
+        label_payload = json.load(f)
+    label_map = label_payload.get("label_to_index", label_payload)
     label_map_inv = {v: k for k, v in label_map.items()}
 
     return interpreter, norm_params, label_map_inv, is_tflite

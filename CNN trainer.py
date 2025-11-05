@@ -9,6 +9,7 @@ from datetime import datetime
 # Config
 # ----------------------------
 DATA_DIR = "processed_dataset"
+STATIC_DATA_DIR = os.path.join(DATA_DIR, "static")
 MODEL_DIR = "trained_model"
 LOG_FILE = os.path.join(MODEL_DIR, "train_log.json")
 os.makedirs(MODEL_DIR, exist_ok=True)
@@ -16,17 +17,18 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 # L2 regularization strength (weight decay)
 L2_REG = 1e-4
 
+
 DATASETS = {
     "onehand": {
-        "npz": os.path.join(DATA_DIR, "gesture_dataset_onehand.npz"),
-        "label_map": os.path.join(DATA_DIR, "label_map_onehand.json"),
-        "norm_params": os.path.join(DATA_DIR, "norm_params_onehand.json"),
+        "npz": os.path.join(STATIC_DATA_DIR, "gesture_dataset_onehand.npz"),
+        "label_map": os.path.join(STATIC_DATA_DIR, "label_map_onehand.json"),
+        "norm_params": os.path.join(STATIC_DATA_DIR, "norm_params_onehand.json"),
         "model_path": os.path.join(MODEL_DIR, "gesture_cnn_onehand.h5"),
     },
     "twohand": {
-        "npz": os.path.join(DATA_DIR, "gesture_dataset_twohand.npz"),
-        "label_map": os.path.join(DATA_DIR, "label_map_twohand.json"),
-        "norm_params": os.path.join(DATA_DIR, "norm_params_twohand.json"),
+        "npz": os.path.join(STATIC_DATA_DIR, "gesture_dataset_twohand.npz"),
+        "label_map": os.path.join(STATIC_DATA_DIR, "label_map_twohand.json"),
+        "norm_params": os.path.join(STATIC_DATA_DIR, "norm_params_twohand.json"),
         "model_path": os.path.join(MODEL_DIR, "gesture_cnn_twohand.h5"),
     }
 }
@@ -38,12 +40,15 @@ def load_dataset(path):
     if not os.path.exists(path):
         print(f"Dataset not found: {path}")
         return None
-    data = np.load(path)
-    return (
-        data["X_train"], data["y_train"],
-        data["X_val"], data["y_val"],
-        data["X_test"], data["y_test"]
-    )
+    with np.load(path) as data:
+        return (
+            data["X_train"],
+            data["y_train"],
+            data["X_val"],
+            data["y_val"],
+            data["X_test"],
+            data["y_test"],
+        )
 
 # ----------------------------
 # Helper: timestamp check
@@ -125,17 +130,33 @@ def train_model(hand_type):
     dataset_path = cfg["npz"]
     model_path = cfg["model_path"]
 
+    label_map_path = cfg["label_map"]
+    norm_params_path = cfg["norm_params"]
+
     # Skip retraining if not needed
     if not os.path.exists(dataset_path):
         print(f"Skipping {hand_type}: dataset not found.")
+        return
+    if not os.path.exists(label_map_path):
+        print(f"Skipping {hand_type}: label map not found at {label_map_path}.")
+        return
+    if not os.path.exists(norm_params_path):
+        print(f"Skipping {hand_type}: normalization params not found at {norm_params_path}.")
         return
     if not should_retrain(dataset_path, model_path):
         print(f"{hand_type.capitalize()} model is up to date — skipping retrain.")
         return
 
     # Load data
-    X_train, y_train, X_val, y_val, X_test, y_test = load_dataset(dataset_path)
-    num_classes = len(json.load(open(cfg["label_map"])))
+    dataset = load_dataset(dataset_path)
+    if dataset is None:
+        return
+    X_train, y_train, X_val, y_val, X_test, y_test = dataset
+
+    with open(label_map_path, "r") as f:
+        label_payload = json.load(f)
+    label_map = label_payload.get("label_to_index", label_payload)
+    num_classes = len(label_map)
 
     # Reshape input for CNN
     X_train = X_train[..., np.newaxis]
