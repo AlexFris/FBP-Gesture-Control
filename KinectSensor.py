@@ -32,7 +32,6 @@ colour frame is returned in OpenCV friendly BGR order.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Iterator, Optional
 
 import cv2
@@ -40,49 +39,18 @@ import numpy as np
 
 try:
     from pykinect2 import PyKinectRuntime, PyKinectV2
-except AssertionError:  # pragma: no cover - triggered by incompatible builds only
-    from importlib import import_module, util
-    import importlib
-    import sys
-
-    def _patch_pykinect_statstg() -> None:
-        """Rewrite the STATSTG size assertion so 72- or 80-byte layouts pass."""
-
-        spec_v2 = util.find_spec("pykinect2.PyKinectV2")
-        if spec_v2 is None or spec_v2.origin is None:
-            raise RuntimeError(
-                "Unable to locate pykinect2.PyKinectV2 source file to patch."
-            )
-
-        source_path = Path(spec_v2.origin)
-        if source_path.suffix == ".pyc":
-            source_path = source_path.with_suffix(".py")
-        if not source_path.exists():
-            raise RuntimeError(
-                "Unable to locate pykinect2.PyKinectV2 source file to patch."
-            )
-        
-        sentinel = "assert sizeof(tagSTATSTG) == 72, sizeof(tagSTATSTG)"
-        replacement = "assert sizeof(tagSTATSTG) in (72, 80), sizeof(tagSTATSTG)"
-
-        original = source_path.read_text(encoding="utf-8")
-        if replacement in original:
-            return  # already patched on disk
-        if sentinel not in original:
-            raise RuntimeError(
-                "Unexpected pykinect2.PyKinectV2 contents; cannot apply STATSTG patch."
-            )
-
-        source_path.write_text(original.replace(sentinel, replacement), encoding="utf-8")
+except AssertionError as exc:  # pragma: no cover - triggered by incompatible builds only
+    try:
+        from pykinect_patch import load_pykinect_modules
+    except Exception as import_patch_exc:  # pragma: no cover - import helper failed
+        raise RuntimeError(
+            "pykinect2 failed an internal structure size check while importing. "
+            "Install a wheel compiled for your Python interpreter (community "
+            "Python 3.8 builds are known to work)."
+        ) from import_patch_exc
 
     try:
-        _patch_pykinect_statstg()
-        importlib.invalidate_caches()
-        sys.modules.pop("pykinect2.PyKinectV2", None)
-        sys.modules.pop("pykinect2.PyKinectRuntime", None)
-        # With the on-disk patch applied we can safely reload both modules.
-        PyKinectRuntime = import_module("pykinect2.PyKinectRuntime")
-        PyKinectV2 = import_module("pykinect2.PyKinectV2")
+        PyKinectRuntime, PyKinectV2 = load_pykinect_modules()
     except Exception as patch_exc:  # pragma: no cover - best effort fallback
         raise RuntimeError(
             "pykinect2 failed an internal structure size check while importing. "
