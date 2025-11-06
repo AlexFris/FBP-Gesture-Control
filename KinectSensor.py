@@ -39,30 +39,10 @@ import numpy as np
 
 try:
     from pykinect2 import PyKinectRuntime, PyKinectV2
-except AssertionError as exc:  # pragma: no cover - triggered by incompatible builds only
-    try:
-        from pykinect_patch import load_pykinect_modules
-    except Exception as import_patch_exc:  # pragma: no cover - import helper failed
-        raise RuntimeError(
-            "pykinect2 failed an internal structure size check while importing. "
-            "Install a wheel compiled for your Python interpreter (community "
-            "Python 3.8 builds are known to work)."
-        ) from import_patch_exc
+except (AssertionError, ImportError) as exc:  # pragma: no cover - informative runtime guards
+    from pykinect_patch import ensure_pykinect_import
 
-    try:
-        PyKinectRuntime, PyKinectV2 = load_pykinect_modules()
-    except Exception as patch_exc:  # pragma: no cover - best effort fallback
-        raise RuntimeError(
-            "pykinect2 failed an internal structure size check while importing. "
-            "An automatic patch that relaxes the STATSTG assertion was attempted "
-            "but did not complete successfully. Install a wheel compiled for your "
-            "Python interpreter (community Python 3.8 builds are known to work)."
-        ) from patch_exc
-except ImportError as exc:  # pragma: no cover - informative error for runtime only
-    raise ImportError(
-        "pykinect2 is required to use the KinectSensor helper. "
-        "Install the Kinect for Windows SDK v2 and the pykinect2 package."
-    ) from exc
+    PyKinectRuntime, PyKinectV2 = ensure_pykinect_import(exc)
 
 
 @dataclass(frozen=True)

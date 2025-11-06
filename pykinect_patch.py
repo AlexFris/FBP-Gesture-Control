@@ -8,6 +8,29 @@ from types import ModuleType
 from typing import Tuple
 
 
+def ensure_pykinect_import(exc: Exception) -> Tuple[ModuleType, ModuleType]:
+    """Resolve pykinect2 import issues triggered by ``KinectSensor``."""
+
+    if isinstance(exc, ImportError):  # pragma: no cover - runtime guidance only
+        raise ImportError(
+            "pykinect2 is required to use the KinectSensor helper. Install the Kinect "
+            "for Windows SDK v2 and the pykinect2 package."
+        ) from exc
+
+    if not isinstance(exc, AssertionError):
+        raise exc
+
+    try:
+        return load_pykinect_modules()
+    except Exception as patch_exc:  # pragma: no cover - best effort fallback
+        raise RuntimeError(
+            "pykinect2 failed an internal structure size check while importing. "
+            "An automatic patch that relaxes the STATSTG assertion was attempted but "
+            "did not complete successfully. Install a wheel compiled for your Python "
+            "interpreter (community Python 3.8 builds are known to work)."
+        ) from patch_exc
+
+
 def _rewrite_statstg_assertion(source_path: Path) -> None:
     """Allow both 72- and 80-byte STATSTG layouts in PyKinectV2."""
 
