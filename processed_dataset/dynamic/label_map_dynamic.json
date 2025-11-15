@@ -1,0 +1,9 @@
+{
+  "dataset_type": "dynamic",
+  "label_to_index": {
+    "test": 0
+  },
+  "hand_modes": [
+    "onehand"
+  ]
+}

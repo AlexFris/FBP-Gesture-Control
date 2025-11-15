@@ -1,0 +1,13 @@
+{
+  "dataset_type": "static",
+  "hand_mode": "onehand",
+  "label_to_index": {
+    "Fist": 0,
+    "Open": 1,
+    "Pinch": 2,
+    "PointL": 3,
+    "PointR": 4,
+    "Thumbs": 5,
+    "test": 6
+  }
+}

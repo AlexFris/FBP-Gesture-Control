@@ -203,7 +203,7 @@ def main():
                 time.sleep(0.3)
 
     release_camera(cap)
-    print(f"Recording session ended. {sample_count} samples saved to {file_name}")
+    print(f"Recording session ended. {sample_count} samples saved to {file_path}")
     print(f"Dynamic clips captured: {dynamic_clip_count}")
 
 
