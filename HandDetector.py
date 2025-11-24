@@ -3,6 +3,49 @@ import math
 import mediapipe as mp
 import numpy as np
 
+class PoseDetector:
+    """
+    Detects body landmarks (limbs, torso, etc.)
+    """
+
+    def __init__(self, static_mode=False, model_complexity=1,
+                 smooth_landmarks=True, segmentation=False,
+                 detectionCon=0.5, minTrackCon=0.5):
+
+        self.static_mode = static_mode
+        self.model_complexity = model_complexity
+        self.smooth_landmarks = smooth_landmarks
+        self.segmentation = segmentation
+        self.detectionCon = detectionCon
+        self.minTrackCon = minTrackCon
+
+        self.mpPose = mp.solutions.pose
+        self.pose = self.mpPose.Pose(
+            static_image_mode=self.static_mode,
+            model_complexity=self.model_complexity,
+            smooth_landmarks=self.smooth_landmarks,
+            enable_segmentation=self.segmentation,
+            min_detection_confidence=self.detectionCon,
+            min_tracking_confidence=self.minTrackCon,
+        )
+
+        self.mpDraw = mp.solutions.drawing_utils
+
+        # Example IDs: wrist, elbow, shoulder
+        self.LeftArmIds = [16, 14, 12]
+
+    def findPose(self, img, draw=True):
+        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        self.results = self.pose.process(imgRGB)
+
+
+
+        if draw and self.results.pose_landmarks:
+            self.mpDraw.draw_landmarks(
+                img, self.results.pose_landmarks, self.mpPose.POSE_CONNECTIONS
+            )
+
+        return img
 
 class HandDetector:
     """
