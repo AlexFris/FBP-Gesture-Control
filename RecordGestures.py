@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from HandDetector import HandDetector
+from BodyDetector import HandDetector
 from PreProcessing import HandNormalizer, combine_hands_features
 from Utilities import parse_camera_args, setup_camera, read_frame, release_camera
 

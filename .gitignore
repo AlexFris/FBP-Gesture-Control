@@ -1,0 +1,9 @@
+.cache-spotify-*
+.cache-*
+.cache-spotify-controller
+
+# Virtual environments
+venv/
+.env/
+env/
+.venv/
