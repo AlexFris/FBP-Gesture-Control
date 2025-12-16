@@ -191,19 +191,50 @@ class SpotifyController:
     # ------------------------
     # Playback control
     # ------------------------
+    def is_playing(self):
+        """
+        Returns True if Spotify is currently playing.
+        Safe to call even if unavailable.
+        """
+        if not self.available:
+            return False
+
+        try:
+            playback = self.sp.current_playback()
+            if not playback:
+                return False
+            return playback.get("is_playing", False)
+
+        except Exception:
+            return False
+
     def play(self):
         if not self.available:  # Skip if Spotify is not properly initialized
             return
         """Resume playback on the active device."""
-        self._ensure_device()
-        self.sp.start_playback(device_id=self.active_device_id)
+        try:
+            if self.is_playing():
+                return  # already playing → do nothing
+
+            self._ensure_device()
+            self.sp.start_playback(device_id=self.active_device_id)
+
+        except Exception as e:
+            print(f"[SPOTIFY] Play failed: {e}")
 
     def pause(self):
         if not self.available:  # Skip if Spotify is not properly initialized
             return
         """Pause playback on the active device."""
-        self._ensure_device()
-        self.sp.pause_playback(device_id=self.active_device_id)
+        try:
+            if not self.is_playing():
+                return  # already paused → do nothing
+
+            self._ensure_device()
+            self.sp.pause_playback(device_id=self.active_device_id)
+
+        except Exception as e:
+            print(f"[SPOTIFY] Pause failed: {e}")
 
     def toggle_play_pause(self):
         if not self.available:  # Skip if Spotify is not properly initialized

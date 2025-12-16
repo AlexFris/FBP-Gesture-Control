@@ -245,6 +245,12 @@ def main():
 
         dispatcher.dispatch(actions)
 
+        dispatcher.sync_state(
+            mode=state_machine.mode,
+            submode=state_machine.submode,
+            control_active=control_active
+        )
+
         # ----------------------------
         # DRAWING
         # ----------------------------

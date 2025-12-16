@@ -72,3 +72,36 @@ class ActionDispatcher:
 
         elif t == ActionType.EXIT_SOUND_VOLUME:
             self.osc.send("/submode/sound/volume", 0)
+
+    def sync_state(self, mode, submode, control_active):
+        """
+        Authoritatively sync global interaction state to OSC.
+        Called once per frame.
+        """
+
+        # ------------------
+        # CONTROL
+        # ------------------
+        self.osc.send_bool("/control/active", control_active)
+
+        # ------------------
+        # MODES
+        # ------------------
+        self.osc.send_bool("/mode/light", int(mode == "LIGHT"))
+        self.osc.send_bool("/mode/sound", int(mode == "SOUND"))
+
+        # ------------------
+        # SUBMODES
+        # ------------------
+        self.osc.send_bool(
+            "/submode/light/color",
+            int(submode == "LIGHT_COLOR")
+        )
+        self.osc.send_bool(
+            "/submode/light/brightness",
+            int(submode == "LIGHT_BRIGHTNESS")
+        )
+        self.osc.send_bool(
+            "/submode/sound/volume",
+            int(submode == "SOUND_VOLUME")
+        )

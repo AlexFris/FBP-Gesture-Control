@@ -125,19 +125,19 @@ class InteractionStateMachine:
         if self.control_active and not is_active:
             self.control_active = False
 
-            self.mode = "IDLE"
-            self.submode = None
+            # Reset FSM state
+            self._reset_to_idle()
 
+            # Emit authoritative reset actions
             actions.append(Action(ActionType.SET_MODE_IDLE))
-
-            # Force-exit all submodes
             actions.append(Action(ActionType.EXIT_LIGHT_BRIGHTNESS))
             actions.append(Action(ActionType.EXIT_LIGHT_COLOR))
             actions.append(Action(ActionType.EXIT_SOUND_VOLUME))
 
-        else:
-            self.control_active = is_active
+            return actions
 
+        # Normal update
+        self.control_active = is_active
         return actions
 
     def process_gesture_event(self, activated=None, deactivated=None, changed=None):
