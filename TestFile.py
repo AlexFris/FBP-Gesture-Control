@@ -18,7 +18,7 @@ while True:
     rgb = k.get_rgb()
     if rgb is None:
         continue
-    h, w = rgb.shape[:2]
+    #h, w = rgb.shape[:2]
 
     # 1) Pose
     pose_detector.findPose(rgb, draw=False)

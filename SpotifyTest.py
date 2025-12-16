@@ -1,4 +1,4 @@
-from SpotifyWrapperModule import SpotifyController
+from SpotifyWrapper import SpotifyController
 from SpotifyCoverWindow import SpotifyCoverWindow
 
 def main():

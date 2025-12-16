@@ -70,7 +70,7 @@ def release_camera(cap):
         cap.release()
     cv2.destroyAllWindows()
 
-def update_fps(prev_time, img=None, draw=True, position=(10, 70),
+def update_fps(prev_time, img=None, draw=True, position=(1700, 40),
                color=(255, 0, 255), scale=3, thickness=3):
     """
     Calculate FPS and optionally draw it on an image.

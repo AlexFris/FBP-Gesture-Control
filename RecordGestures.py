@@ -111,6 +111,9 @@ def main():
             print("Camera read failed.")
             break
 
+        # Mirror the camera feed (horizontal flip)
+        img = cv2.flip(img, 1)
+
         debug_img = copy.deepcopy(img)
         hands, _ = detector.findHands(debug_img, draw=True)
 

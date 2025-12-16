@@ -3,11 +3,12 @@
   "hand_mode": "onehand",
   "label_to_index": {
     "Fist": 0,
-    "Open": 1,
-    "Pinch": 2,
-    "PointL": 3,
-    "PointR": 4,
-    "Thumbs": 5,
-    "test": 6
+    "Flat": 1,
+    "Light": 2,
+    "Open": 3,
+    "Pinch": 4,
+    "Point": 5,
+    "Sound": 6,
+    "Thumbs": 7
   }
 }

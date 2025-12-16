@@ -1,4 +1,4 @@
-from PhillipsHueWrapperModule import HueController
+from HueWrapper import HueController
 import time
 
 # Your bridge info

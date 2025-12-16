@@ -1,9 +1,9 @@
 {
     "onehand": {
-        "last_trained": "2025-11-13 21:07:33",
-        "test_accuracy": 0.9978,
-        "epochs_run": 29,
+        "last_trained": "2025-12-12 05:12:39",
+        "test_accuracy": 0.9981,
+        "epochs_run": 24,
         "dataset_file": "gesture_dataset_onehand.npz",
-        "dataset_mtime": "2025-11-13 21:06:32"
+        "dataset_mtime": "2025-12-12 05:10:21"
     }
 }

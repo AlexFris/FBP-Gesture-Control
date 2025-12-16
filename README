@@ -1,0 +1,8 @@
+For Hue and Spotify to work you need to set your own virtual environment variables:
+HUE
+- HUE_BRIDGE_IP = 192.168.xxx.xxx
+- HUE_USERNAME = xxxxxxxxxxx
+SPOTIFY
+- SPOTIPY_CLIENT_ID =
+- SPOTIPY_CLIENT_SECRET =
+- SPOTIPY_REDIRECT_URL
