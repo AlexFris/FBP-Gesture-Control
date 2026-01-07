@@ -85,3 +85,9 @@ class TDOSC:
             return
         """Send a test message to confirm connection."""
         self.send("/ping", 1)
+
+    def disconnect(self):
+        if not self.available:  # If no OSC channel is set up or set up properly then skip
+            return
+        """Send a test message to confirm connection."""
+        self.send("/ping", 0)

@@ -6,7 +6,7 @@ from HueWrapper import HueController
 from KinectWrapper import KinectManager
 from OSCWrapper import TDOSC
 from SpotifyWrapper import SpotifyController
-from GestureStateWrapper import GestureStabilizer, InteractionStateMachine
+from GestureStateWrapper import InteractionStateMachine, PointIntentTracker, PerHandGestureTracker, compute_gesture_events, HandIdentityTracker
 from ActionDispatcher import ActionDispatcher
 import threading
 import time
@@ -16,8 +16,6 @@ import time
 # ----------------------------
 
 # Hue
-#BRIDGE_IP = os.getenv("BRIDGE_IP") # Loads the envirinment variable or replace with your bridge IP
-#USERNAME = "958lVW8ABIsBp5r6fOpabdgkiZq3Kh-4PoerQ1bD"       # Replace with your Hue API username
 TARGET_LIGHT = "Hue color lamp"         # Name of your Hue lamp to control
 
 # Inference model paths
@@ -32,34 +30,45 @@ def main():
 
     # Initialize Kinect
     k = KinectManager()
-    pTime = 0
+    pTime = 0   # Used for FPS calculation
 
-    # Initialize OSC connection
+    # Initialize OSC connection 192.168.1.49
     osc = TDOSC(ip="192.168.1.49", port=8009, verbose=True)
-    osc.ping()
+    osc.ping()  # Sends a test message of "1"
 
     # Initialize Hue connection
     hue = HueController()
 
     # Spotify controller
     sp = SpotifyController()
-    # Check Spotify active device
     sp.set_active_device()  # Make sure we have an active device
-
-    # Initialize detectors
-    hand_detector = HandDetector()
-    pose_detector = PoseDetector()
-
-    # Initialize GestureStateWrapper Classes
-    gesture_stabilizer = GestureStabilizer()
-    state_machine = InteractionStateMachine()
 
     spotify_thread = threading.Thread(
         target=spotify_osc_loop,
         args=(sp, osc),
         daemon=True
     )
-    spotify_thread.start()
+    spotify_thread.start()  # Runs the snippet of code at the end of this file, running spotify info
+
+    # Initialize detectors
+    hand_detector = HandDetector()
+    pose_detector = PoseDetector()
+    hand_id_tracker = HandIdentityTracker(
+        base_match_distance_px=100,
+        max_missing_frames=15,
+        velocity_weight=0.6
+    )
+    hand_inference_by_id = {}
+
+    # Initialize GestureStateWrapper classes
+    per_hand_tracker = PerHandGestureTracker(
+        frames_needed_up=7,
+        frames_needed_down=5,
+        confidence_threshold=0.6
+    )
+    state_machine = InteractionStateMachine()
+
+    prev_selected = None
 
     # ActionDispatcher
     dispatcher = ActionDispatcher(
@@ -70,20 +79,13 @@ def main():
     )
 
 
-    #load gesture models
-    if os.path.exists(onehand_model_path):
-        onehand_inference = LiveGestureInference(hand_type="onehand")
-    else:
-        raise FileNotFoundError(f"One-hand model not found: {onehand_model_path}")
-
-    if os.path.exists(twohand_model_path):
-        twohand_inference = LiveGestureInference(hand_type="twohand")
-    else:
-        print(f"One-hand model not found: {onehand_model_path}")
-
+    point_tracker = PointIntentTracker(
+        dwell_frames=8,
+        release_frames=3,
+        grace_frames=20
+    )
 
     control_active = 0
-
 
     # ----------------------------
     # MAIN LOOP
@@ -97,14 +99,15 @@ def main():
             continue # Skip this frame safely
 
         # Canonical images
-        raw_img_rgb = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
-        debug_img = raw_img.copy()  # BGR, safe to draw on
+        raw_img_rgb = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)  # Now in the correct type for Mediapipe
+        debug_img = raw_img.copy()  # BGR, safe to draw on with OpenCV
 
         # ----------------------------
         # DETECTION/TRACKING
         # ----------------------------
         # Run detection models
         hands, debug_img = hand_detector.findHands(debug_img, draw=True)
+        identified_hands = hand_id_tracker.update(hands)
         pose_detector.findPose(raw_img_rgb, draw=False)
         pose_lm = pose_detector.results.pose_landmarks if pose_detector.results else None
 
@@ -145,90 +148,184 @@ def main():
                     (20, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         """
 
-        # Choose which hand to use for one-hand inference
-        preferred_type = None
-        if right_up:
-            preferred_type = "Right"
-        elif left_up:
-            preferred_type = "Left"
-
-        hands_for_onehand = []
-        if preferred_type is not None:
-            hands_for_onehand = [h for h in hands if h.get("type") == preferred_type]
-
-        # If we didn't find the preferred hand (e.g., detector mislabeled), optionally fall back:
-        if preferred_type is not None and len(hands_for_onehand) == 0 and len(hands) > 0:
-            # fallback: pick the first detected hand
-            hands_for_onehand = [hands[0]]
-
-        # ----------------------------
-        # GESTURE CLASSIFICATION
-        # ----------------------------
-        gesture_one, conf_one = None, 0.0
-        if onehand_inference:
-            _, gesture_one, conf_one = onehand_inference.predict_frame(hands_for_onehand, debug_img)
-            if gesture_one:
-                cv2.putText(debug_img, f"{gesture_one} ({conf_one:.2f})",
-                (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 2)
-
-        # ----------------------------
-        # SPATIAL CONTROL
-        # ----------------------------
-        point_direction = None
-
-        if gesture_one == "Point" and len(hands_for_onehand) == 1:
-            hand = hands_for_onehand[0]
-            lm = hand["lmList"]
-
-            wrist_x = lm[0][0]
-            index_tip_x = lm[8][0]
-
-            if index_tip_x < wrist_x:
-                point_direction = "LEFT"
-            else:
-                point_direction = "RIGHT"
-        cv2.putText(debug_img, f"{point_direction}",
-                    (110, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2)
-        # ----------------------------
-        # Controlling
-        # ----------------------------
+        # Checks if a hand is raised and if so communicates that state over OSC
         if left_up or right_up:
             control_active = 1
         else:
             control_active = 0
         osc.send_bool("/control/active", control_active)
 
+        # Communicates over OSC if there is a hand in frame
         detected = 0
         if len(hands) > 0 and control_active < 1:
-            cv2.putText(debug_img, "I see hands",
-                        (10, 150), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2)
             detected = 1
             osc.send_bool("/control/detected", detected)
         else:
             detected = 0
             osc.send_bool("/control/detected", detected)
 
+        # ----------------------------
+        # GESTURE CLASSIFICATION (PER HAND)
+        # ----------------------------
+        hand_gestures = []  # list of dicts: {hand, gesture, confidence}
 
-        predicted_gesture = gesture_one  # string or None
-        confidence = conf_one  # float 0.0–1.0
+        for item in identified_hands:
+            handID = item["id"]
+            hand = item["hand"]
 
-        activated, deactivated, changed = gesture_stabilizer.update(predicted_gesture, confidence)
+            hand_for_inference = hand.copy()
 
-        """
-        # Print event-based transitions
-        if activated:
-            print(f"[EVENT] Gesture ACTIVATED → {activated}")
+            # Canonicalize orientation: mirror LEFT hands
+            if hand["type"] == "Left":
+                hand_for_inference["lmList"] = mirror_landmarks_x(
+                    hand["lmList"],
+                    image_width=debug_img.shape[1]
+                )
 
-        if deactivated:
-            print(f"[EVENT] Gesture DEACTIVATED → {deactivated}")
+            hand_id = item["id"]
 
-        if changed:
-            old, new = changed
-            print(f"[EVENT] Gesture CHANGED → {old} → {new}")
-        """
+            if hand_id not in hand_inference_by_id:
+                hand_inference_by_id[hand_id] = LiveGestureInference(hand_type="onehand")
 
-        # Always check the current stabilized gesture
-        current = gesture_stabilizer.stable_gesture
+            inference = hand_inference_by_id[hand_id]
+
+            hand_for_inference = hand.copy()
+
+            # Canonicalize orientation
+            if hand["type"] == "Left":
+                hand_for_inference["lmList"] = mirror_landmarks_x(
+                    hand["lmList"],
+                    image_width=debug_img.shape[1]
+                )
+
+            _, gesture, conf = inference.predict_frame(
+                [hand_for_inference],
+                debug_img
+            )
+
+            hand_gestures.append({
+                "id": handID,
+                "hand": hand,
+                "gesture": gesture,
+                "confidence": conf
+            })
+
+            # Debug overlay per hand
+            if gesture:
+                cx, cy = hand["center"]
+                cv2.putText(
+                    debug_img,
+                    f"{handID} {gesture} ({conf:.2f})",
+                    (cx - 40, cy - 120),
+                    cv2.FONT_HERSHEY_PLAIN,
+                    2,
+                    (0, 255, 0),
+                    2
+                )
+
+        # ----------------------------
+        # PER-HAND STABILIZATION
+        # ----------------------------
+        per_hand_tracker.update(hand_gestures)
+
+        stable_gestures = []
+
+        for g in hand_gestures:
+            hid = g["id"]
+            stable = per_hand_tracker.stable(hid)
+            if stable is not None:
+                stable_gestures.append({
+                    "id": hid,
+                    "hand": g["hand"],
+                    "gesture": stable
+                })
+
+        # ----------------------------
+        # SELECT AUTHORITATIVE GESTURE (FROM STABILIZED PER HAND)
+        # ----------------------------
+        selected_hand_id = None
+        predicted_gesture = None
+
+        # 1) Point always allowed, prefer right hand
+        point_hands = [g for g in stable_gestures if g["gesture"] == "Point"]
+
+        if point_hands:
+            right_points = [g for g in point_hands if g["hand"]["type"] == "Right"]
+            chosen = right_points[0] if right_points else point_hands[0]
+
+            selected_hand_id = chosen["id"]
+            predicted_gesture = "Point"
+
+        # 2) Other gestures require control_active
+        elif control_active:
+            right_hands = [g for g in stable_gestures if g["hand"]["type"] == "Right"]
+            chosen = right_hands[0] if right_hands else (stable_gestures[0] if stable_gestures else None)
+
+            if chosen:
+                selected_hand_id = chosen["id"]
+                predicted_gesture = chosen["gesture"]
+
+        # ----------------------------
+        # SPATIAL CONTROL (POINT)
+        # ----------------------------
+        point_direction = None
+
+        if predicted_gesture == "Point" and selected_hand_id is not None:
+            h = next((g["hand"] for g in hand_gestures if g["id"] == selected_hand_id), None)
+            if h:
+                lm = h["lmList"]
+                point_direction = "LEFT" if lm[8][0] < lm[0][0] else "RIGHT"
+
+        # Debug text
+        cv2.putText(
+            debug_img,
+            f"Point dir: {point_direction}",
+            (10, 180),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 0, 255) if point_direction else (120, 120, 120),
+            2
+        )
+
+        mode_commit, return_idle = point_tracker.update(
+            point_dir=point_direction,
+            control_active=bool(control_active)
+        )
+
+        if mode_commit:
+            ext_actions = state_machine.set_mode_external(mode_commit)
+            dispatcher.dispatch(ext_actions)
+
+        if return_idle:
+            ext_actions = state_machine.set_idle_external()
+            dispatcher.dispatch(ext_actions)
+
+        # ----------------------------
+        # Controlling
+        # ----------------------------
+        current_selected = (
+            selected_hand_id,
+            predicted_gesture
+        ) if predicted_gesture else None
+
+        activated, deactivated, changed = compute_gesture_events(
+            prev_selected,
+            current_selected
+        )
+
+        if activated and selected_hand_id is not None:
+            hand_id_tracker.lock_track(selected_hand_id)
+
+        if deactivated and selected_hand_id is not None:
+            hand_id_tracker.unlock_track(selected_hand_id)
+        if not control_active:
+            hand_id_tracker.unlock_all()
+        if return_idle:
+            hand_id_tracker.unlock_all()
+
+        prev_selected = current_selected
+
+        current = predicted_gesture
 
         # Update control_active flag (from your arm-upright logic)
         control_actions = state_machine.update_control_active(control_active)
@@ -299,6 +396,7 @@ def main():
             cv2.imshow("Debug Feed", debug_img)
 
         if cv2.waitKey(1) & 0xFF == 27:
+            osc.disconnect()    # resets ping to 0 for debugging in TD
             break
 
 def spotify_osc_loop(spotify, osc, update_interval=0.5):
@@ -324,6 +422,13 @@ def spotify_osc_loop(spotify, osc, update_interval=0.5):
             print(f"[Spotify OSC] Error: {e}")
 
         time.sleep(update_interval)
+
+def mirror_landmarks_x(lm_list, image_width):
+    """
+    Mirrors hand landmarks horizontally so Left hands match Right-hand orientation.
+    """
+    return [(image_width - x, y, z) for (x, y, z) in lm_list]
+
 
 if __name__ == "__main__":
     main()

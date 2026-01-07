@@ -47,7 +47,7 @@ class HueController:
     # ============================================================
     # Basic Light Controls
     # ============================================================
-    def turn_on(self, light_name, transition=0):
+    def turn_on(self, light_name, transition=20):
         if not self.available:  # If no bridge connection is established, skip
             return
         """
@@ -66,7 +66,7 @@ class HueController:
         else:
             print(f"[WARN] Light '{light_name}' not found")
 
-    def turn_off(self, light_name, transition=0):
+    def turn_off(self, light_name, transition=5):
         if not self.available:  # If no bridge connection is established, skip
             return
         """
@@ -83,7 +83,7 @@ class HueController:
         else:
             print(f"[WARN] Light '{light_name}' not found")
 
-    def toggle(self, light_name, transition=0):
+    def toggle(self, light_name, transition=5):
         if not self.available:  # If no bridge connection is established, skip
             return
         """
